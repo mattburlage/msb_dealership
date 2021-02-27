@@ -343,3 +343,9 @@ def do_all_the_things():
     print("Never gonna run around ")
     time.sleep(2)
     print("and hurt you")
+    time.sleep(2)
+
+    for i in range(0, 2):
+        print("\n")
+
+    print("More info: https://www.youtube.com/watch?v=dQw4w9WgXcQ")
