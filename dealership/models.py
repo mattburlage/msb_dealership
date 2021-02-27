@@ -5,7 +5,15 @@ by Matthew Smith-Burlage
 Created: 2/26/2021
 Last Edit: 2/27/2021
 
-A car dealership represented by Django models and some testing functions
+A car dealership represented by Django models with some testing functions.
+
+Note:   To find implemented models, start on line 51.
+        To find instantiated test data, start on line 181.
+        To find solutions to requested queries, start on line 298.
+
+        To find out how I actually *did* open my own dealership with my
+            new found expertise just blindly run `open_dealership()`
+            without looking at the code on line 382. :)
 
 """
 
@@ -17,6 +25,8 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import Count, When, IntegerField, Case
 
+
+# Model validators
 
 def is_not_negative(value):
     return value >= 0
@@ -35,24 +45,37 @@ def year_validator(value):
     if not earliest_year <= value <= latest_year:
         raise ValidationError(f"Invalid car year. Must be between {earliest_year} and {latest_year}.")
 
+# Models
+
 
 class Dealership(models.Model):
     """ Tracks each dealership instance """
 
     name = models.CharField(max_length=64)
+    tag_line = models.CharField(max_length=250, null=True, blank=True)
     owner = models.ForeignKey(User, on_delete=models.PROTECT)
 
     # Uses same year validation as cars for simplicity
     year_established = models.IntegerField(validators=[year_validator])
 
     def find_red_fords_under_30000(self):
-        # Find cars from this dealership that match the requested criteria
-        cars = self.cars.filter(make__company_name="Ford", color__color_name='Red', mileage__lt=30000)
-        # Filter out cars that are not on the lot (aka already sold) and order them by list price
-        return cars.filter(sold_date__isnull=True).order_by('-list_price_cents')
+        """
+        Finds red fords under 30000 miles that are still on the lot (not sold)
+        Returns them in descending order by list price
+        """
 
-    # Related fields:
-    # - cars: QuerySet of Car Model objects that belong to the dealership
+        # Find cars from this dealership that match the requested criteria
+        # Filter out cars that are not on the lot (aka already sold) and order the rest by list price
+
+        return self.cars.filter(
+            make__company_name="Ford",
+            color__color_name='Red',
+            mileage__lt=30000,
+            sold_date__isnull=True
+        ).order_by('-list_price_cents')
+
+    # Related fields:)
+    # - cars: QuerySet of Car Model objects that belong to the dealership (using `cars.all()`)
 
     def __str__(self):
         return self.name
@@ -119,7 +142,7 @@ class Car(models.Model):
 
     @sold_price.setter
     def sold_price(self, price):
-        """ Set sold price given float """
+        """ Set sold price given a float """
         if price >= 0:
             # Convert to integer (as cents) to avoid floating point imprecision
             self.sold_price_cents = int(price * 100)
@@ -134,7 +157,7 @@ class Car(models.Model):
 
     @list_price.setter
     def list_price(self, price):
-        """ Set sold price given float """
+        """ Set sold price given a float """
         if price >= 0:
             # Convert to integer (as cents) to avoid floating point imprecision
             self.list_price_cents = int(price * 100)
@@ -144,16 +167,24 @@ class Car(models.Model):
 
     def sell_car(self, sale_price):
         """ Marks car as sold today with price """
-        self.sold_price = sale_price
-        self.sold_date = datetime.date.today()
-        self.save()
+        if sale_price >= 0:
+            self.sold_price = sale_price
+            self.sold_date = datetime.date.today()
+            self.save()
+        else:
+            raise ValueError("Price should not be negative.")
 
     def __str__(self):
         return f"{self.make} {self.model} ({self.year})"
 
 
+# Testing functions
+
 def populate_data():
     """ Adds test data to all needed models """
+
+    # This could be refactored using for loops to make the code base
+    # a bit smaller, but I've spelled out each car below for clarity.
 
     # Reset tables
     Dealership.objects.all().delete()
@@ -162,17 +193,18 @@ def populate_data():
 
     # Define dealership
     user = User.objects.create(
-        username='sbuschemi',
-        first_name='Steve',
-        last_name='Buschemi',
-        email='sbuschemi@comcast.org'
+        username='rastley',
+        first_name='Richard',
+        last_name='Astley',
+        email='rastley@aol.com'
     )
-    user.set_password('IWasGreatInTheIsland2005!')
+    user.set_password('NoStrangersToLove123!')
 
     dealer = Dealership.objects.create(
-        name="Rick's Loyal Car Emporium",
+        name="Honest Rick's Car Emporium",
+        tag_line="We will never let you down.",
         owner=user,
-        year_established=1988,
+        year_established=1987,
     )
 
     # Define car1
@@ -248,8 +280,8 @@ def populate_data():
         mileage=20000,
         list_price_cents=700000,
     )
-    focus = CarModelOption.objects.create(model_name="focus", company=ford)
 
+    focus = CarModelOption.objects.create(model_name="focus", company=ford)
     Car.objects.create(
         make=ford,
         model=focus,
@@ -263,11 +295,65 @@ def populate_data():
     return [car1, car2, car3, car4]
 
 
-def do_all_the_things():
-    """ Run some tests. Of course, normally this would be done more methodically in tests.py. """
-    cars = populate_data()
+def run_spec_queries(open_own_dealership=False):
+    """
+    Run the assigned queries front the specification based on the above models
+    If specified, opens own car dealership, per specification :)
+    """
 
-    # Testing for the model itself
+    # Set up test data
+    populate_data()
+
+    # Run the queries
+
+    # "Write a query to find all cars (no matter the dealership) with
+    # mileage below an integer limit (eg 20,000 miles)"
+    # -----------------------------------------------------------
+    mileage_limit = 100000
+    five_digit_mileage_cars = Car.objects.filter(mileage__lt=mileage_limit)
+
+    # "Write a query to find all dealerships that have more than 3
+    # cars on their lot that were established after 1980."
+    # -----------------------------------------------------------
+    # This query counts how many cars each dealership has
+    # whose sold_date is null (aka still on the lot)
+    # and then filters out dealerships with 2 or fewer such
+    # cars and dealerships not established after 1980.
+    # Of course, this could be done as a single line,
+    # but this approach is much more readable.
+    cars_on_lot = Count(Case(When(cars__sold_date__isnull=True, then=1), output_field=IntegerField(), ))
+    old_dealers = Dealership.objects.annotate(num_cars=cars_on_lot).filter(year_established__gt=1980, num_cars__gte=3)
+
+    # "Write a method for the dealership model that returns only red Fords under
+    # 30,000 miles on their lot, ordered by price descending"
+    # -----------------------------------------------------------
+    dealership = Dealership.objects.first()
+    red_fords_low_mileage = dealership.find_red_fords_under_30000()
+
+    # Print results
+
+    print("\"Write a query to find all cars (no matter the dealership) "
+          "with mileage below an integer limit (eg 20,000 miles)\"")
+    print(five_digit_mileage_cars)
+
+    print("\"Write a query to find all dealerships that have more than 3 "
+          "cars on their lot that were established after 1980.\"")
+    print(old_dealers)
+
+    print("\"Write a method for the dealership model that returns only red "
+          "Fords under 30,000 miles on their lot, ordered by price descending\"")
+    print(red_fords_low_mileage)
+
+    input("Press enter to continue...")
+
+    if open_own_dealership:
+        open_dealership(dealership.name)
+
+
+def run_tests():
+    """ Run some tests. Of course, normally this would be done more methodically in tests.py. """
+
+    cars = populate_data()
 
     # test list price int to float
     assert cars[0].list_price == 4000.00
@@ -287,54 +373,27 @@ def do_all_the_things():
     cars[0].sell_car(15444.45)
     assert cars[0].is_sold()
 
-    # Re-set up data to run specified queries
-    populate_data()
 
-    # Run queries asked for by specification
+def do_all_the_things():
+    run_tests()
+    run_spec_queries(open_own_dealership=True)
 
-    print("\"Write a query to find all cars (no matter the dealership) "
-          "with mileage below an integer limit (eg 20,000 miles)\"")
-    mileage_limit = 100000
-    print(f"Mileage limit: {mileage_limit}")
-    five_digit_mileage_cars = Car.objects.filter(mileage__lt=mileage_limit)
-    print(five_digit_mileage_cars)
 
-    print("\n")
-    time.sleep(1)
-
-    print("\"Write a query to find all dealerships that have more than 3 "
-          "cars on their lot that were established after 1980.\"")
-    # This query counts how many cars each dealership has whose sold_date is null (aka still on the lot, as asked)
-    # And then filters out dealerships with 2 or fewer such cars and dealerships not established after 1980
-    old_dealerships = Dealership.objects.annotate(
-        num_cars=Count(Case(When(cars__sold_date__isnull=True, then=1), output_field=IntegerField(), ))
-    ).filter(year_established__gt=1980, num_cars__gte=3)
-    print(old_dealerships)
-
-    print("\n")
-    time.sleep(1)
-
-    print("\"Write a method for the dealership model that returns only red "
-          "Fords under 30,000 miles on their lot, ordered by price descending\"")
-    dealership = Dealership.objects.first()
-    red_fords_low_mileage = dealership.find_red_fords_under_30000()
-    print(red_fords_low_mileage)
-
-    print("\n")
-    time.sleep(1)
+def open_dealership(dealership_name="Honest Rick's Car Emporium"):
+    """ Opens a car dealership """
 
     print("\"Open an actual car dealership with your newfound expertise :)\"")
-    print("Okay, done. Please enter your name:")
-    name = input()
+    name = input("Okay, done. :) Please enter your name: ")
 
-    for i in range(0, 15):
-        print("\n")
+    print("\n\n\n\n")
 
-    print(f'Welcome {name} to {dealership.name} where we are...')
-    time.sleep(3)
+    print(f'Hello {name}. Welcome to {dealership_name},')
+    time.sleep(1)
+    print("where we are...")
 
-    for i in range(0, 15):
-        print("\n")
+    for i in range(0, 3):
+        time.sleep(1)
+        print("\n\n")
 
     print("Never gonna give you up")
     time.sleep(2)
@@ -344,8 +403,15 @@ def do_all_the_things():
     time.sleep(2)
     print("and hurt you")
     time.sleep(2)
+    print("\nNever gonna make you cry")
+    time.sleep(2)
+    print("Never gonna say goodbye")
+    time.sleep(2)
+    print("Never gonna tell a lie")
+    time.sleep(2)
+    print("and desert you")
+    time.sleep(2)
 
-    for i in range(0, 2):
-        print("\n")
+    print("\n")
 
     print("More info: https://www.youtube.com/watch?v=dQw4w9WgXcQ")
