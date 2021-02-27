@@ -1,4 +1,5 @@
 import datetime
+import time
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -100,7 +101,10 @@ class Car(models.Model):
     @property
     def sold_price(self):
         """ Return sold price as a float """
-        return self.sold_price / 100
+        if self.sold_price_cents:
+            return self.sold_price_cents / 100
+        else:
+            return None
 
     @sold_price.setter
     def sold_price(self, price):
@@ -115,7 +119,7 @@ class Car(models.Model):
     @property
     def list_price(self):
         """ Return list price as a float """
-        return self.list_price / 100
+        return self.list_price_cents / 100
 
     @list_price.setter
     def list_price(self, price):
@@ -127,12 +131,18 @@ class Car(models.Model):
         else:
             raise ValueError("Price should not be negative.")
 
+    def sell_car(self, sale_price):
+        """ Marks car as sold today with price """
+        self.sold_price = sale_price
+        self.sold_date = datetime.date.today()
+        self.save()
+
     def __str__(self):
         return f"{self.make} {self.model} ({self.year})"
 
 
-def do_all_the_things():
-    """ Execute all operations described in specification """
+def populate_data():
+    """ Adds test data to all needed models """
 
     # Reset tables
     Dealership.objects.all().delete()
@@ -149,7 +159,7 @@ def do_all_the_things():
     user.set_password('IWasGreatInTheIsland2005!')
 
     dealer = Dealership.objects.create(
-        name="Matt's Car Emporium and Hibachi Dinner Warehouse",
+        name="Rick's Loyal Car Emporium",
         owner=user,
         year_established=1988,
     )
@@ -158,7 +168,7 @@ def do_all_the_things():
     ford = CarMakeOption.objects.create(company_name="Ford")
     escape = CarModelOption.objects.create(model_name="Escape", company=ford)
     black = CarColorOption.objects.create(color_name="Black")
-    Car.objects.create(
+    car1 = Car.objects.create(
         make=ford,
         model=escape,
         year=2007,
@@ -174,7 +184,7 @@ def do_all_the_things():
     subaru = CarMakeOption.objects.create(company_name="Subaru")
     forrester = CarModelOption.objects.create(model_name="Forrester", company=subaru)
     grey = CarColorOption.objects.create(color_name="Grey")
-    Car.objects.create(
+    car2 = Car.objects.create(
         make=subaru,
         model=forrester,
         year=2015,
@@ -183,13 +193,13 @@ def do_all_the_things():
         mileage=30001,
         list_price_cents=1458700,
         sold_price_cents=1458805,
-        # sold_date=datetime.date.today() - datetime.timedelta(days=400),  # Comment/uncomment to test old_dealerships
+        sold_date=datetime.date.today() - datetime.timedelta(days=400),  # Comment to test old_dealerships
     )
 
     # Define car3
     fusion = CarModelOption.objects.create(model_name="Fusion", company_id=2)
     red = CarColorOption.objects.create(color_name="Red")
-    Car.objects.create(
+    car3 = Car.objects.create(
         make=ford,
         model=fusion,
         year=2011,
@@ -205,7 +215,7 @@ def do_all_the_things():
     smart = CarMakeOption.objects.create(company_name='smart')
     smartcar = CarModelOption.objects.create(model_name="car", company_id=2)
     green = CarColorOption.objects.create(color_name="green")
-    Car.objects.create(
+    car4 = Car.objects.create(
         make=smart,
         model=smartcar,
         year=2012,
@@ -214,16 +224,74 @@ def do_all_the_things():
         mileage=6,
         list_price_cents=500,
         sold_price_cents=499,
-        # sold_date=datetime.date.today() - datetime.timedelta(days=100),  # Comment/uncomment to test old_dealerships
+        sold_date=datetime.date.today() - datetime.timedelta(days=100),  # Comment to test old_dealerships
     )
 
-    # Write a query to find all cars (no matter the dealership) with mileage below an integer limit (e.g. 20,000 miles)
+    return [car1, car2, car3, car4]
+
+
+def do_all_the_things():
+    """ Run some tests. Of course, normally this would be done more methodically in tests.py. """
+    cars = populate_data()
+
+    # Testing for the model itself
+
+    assert cars[0].list_price == 4000.00
+    assert cars[3].is_sold()
+
+    assert not cars[2].is_sold()
+    cars[2].sold_price = 3456.23
+    cars[2].sold_date = datetime.date.today()
+    cars[2].save()
+    assert cars[2].is_sold()
+
+    assert not cars[0].is_sold()
+    cars[0].sell_car(15444.45)
+    assert cars[0].is_sold()
+
+    # Re-set up data to run specified queries
+    populate_data()
+
+    # Run queries asked for by specification
+
+    print("\"Write a query to find all cars (no matter the dealership) "
+          "with mileage below an integer limit (eg 20,000 miles)\"")
     five_digit_mileage_cars = Car.objects.filter(mileage__lt=100000)
+    print(five_digit_mileage_cars)
 
-    # Write a query to find all dealerships that have more than 3 cars on their lot that were established after 1980
+    time.sleep(1)
 
-    # This query counts how many cars each dealership has whose sold_date is null (therefore still on the lot, as asked)
+    print("\"Write a query to find all dealerships that have more than 3 "
+          "cars on their lot that were established after 1980.\"")
+    # This query counts how many cars each dealership has whose sold_date is null (aka still on the lot, as asked)
     # And then filters out dealerships with 2 or fewer such cars and dealerships not established after 1980
     old_dealerships = Dealership.objects.annotate(
-        num_cars=Count(Case(When(cars__sold_date__isnull=True, then=1), output_field=IntegerField(),))
+        num_cars=Count(Case(When(cars__sold_date__isnull=True, then=1), output_field=IntegerField(), ))
     ).filter(year_established__gt=1980, num_cars__gte=3)
+    print(old_dealerships)
+
+    time.sleep(1)
+
+    print("\"Write a method for the dealership model that returns only red "
+          "Fords under 30,000 miles on their lot, ordered by price descending\"")
+    dealership = Dealership.objects.first()
+    red_fords_low_mileage = dealership.find_red_fords_under_30000()
+    print(red_fords_low_mileage)
+
+    time.sleep(1)
+
+    print("\"Open an actual car dealership with your newfound expertise :)\"")
+    print("Okay, done. Enter your name:")
+    name = input()
+
+    print(f'Welcome {name} to {dealership.name} where we are...')
+    time.sleep(1)
+    print("Never gonna give you up")
+    time.sleep(1)
+    print("Never gonna let you down")
+    time.sleep(1)
+    print("Never gonna run around ")
+    time.sleep(1)
+    print("and hurt you")
+    time.sleep(1)
+    print("More info: https://www.youtube.com/watch?v=dQw4w9WgXcQ")
