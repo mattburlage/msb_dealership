@@ -7,8 +7,8 @@ Last Edit: 2/27/2021
 
 A car dealership represented by Django models with some testing functions.
 
-Note:   To find implemented models, start on line 51.
-        To find instantiated test data, start on line 181.
+Note:   To find implemented models, start on line 48.
+        To find instantiated test data, start on line 183.
         To find solutions to requested queries, start on line 298.
 
         To find out how I actually *did* open my own dealership with my
