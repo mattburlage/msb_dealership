@@ -1,3 +1,14 @@
+"""
+My Very Own Car Dealership
+by Matthew Smith-Burlage
+
+Created: 2/26/2021
+Last Edit: 2/27/2021
+
+A car dealership represented by Django models and some testing functions
+
+"""
+
 import datetime
 import time
 
@@ -197,7 +208,7 @@ def populate_data():
     )
 
     # Define car3
-    fusion = CarModelOption.objects.create(model_name="Fusion", company_id=2)
+    fusion = CarModelOption.objects.create(model_name="Fusion", company=ford)
     red = CarColorOption.objects.create(color_name="Red")
     car3 = Car.objects.create(
         make=ford,
@@ -213,7 +224,7 @@ def populate_data():
 
     # Define car4
     smart = CarMakeOption.objects.create(company_name='smart')
-    smartcar = CarModelOption.objects.create(model_name="car", company_id=2)
+    smartcar = CarModelOption.objects.create(model_name="car", company=smart)
     green = CarColorOption.objects.create(color_name="green")
     car4 = Car.objects.create(
         make=smart,
@@ -222,9 +233,31 @@ def populate_data():
         color=green,
         dealership=dealer,
         mileage=6,
-        list_price_cents=500,
-        sold_price_cents=499,
+        list_price_cents=500,  # Yes, this is meant to be $5.00. :)
+        sold_price_cents=499,  # Same as above.
         sold_date=datetime.date.today() - datetime.timedelta(days=100),  # Comment to test old_dealerships
+    )
+
+    # Define additional cars
+    Car.objects.create(
+        make=ford,
+        model=escape,
+        year=2009,
+        color=red,
+        dealership=dealer,
+        mileage=20000,
+        list_price_cents=700000,
+    )
+    focus = CarModelOption.objects.create(model_name="focus", company=ford)
+
+    Car.objects.create(
+        make=ford,
+        model=focus,
+        year=2008,
+        color=grey,
+        dealership=dealer,
+        mileage=130000,
+        list_price_cents=540000,
     )
 
     return [car1, car2, car3, car4]
@@ -236,15 +269,20 @@ def do_all_the_things():
 
     # Testing for the model itself
 
+    # test list price int to float
     assert cars[0].list_price == 4000.00
+
+    # test the .is_sold method
     assert cars[3].is_sold()
 
+    # test moving a car from not sold to sold manually
     assert not cars[2].is_sold()
     cars[2].sold_price = 3456.23
     cars[2].sold_date = datetime.date.today()
     cars[2].save()
     assert cars[2].is_sold()
 
+    # test the .sell_car method
     assert not cars[0].is_sold()
     cars[0].sell_car(15444.45)
     assert cars[0].is_sold()
@@ -256,9 +294,12 @@ def do_all_the_things():
 
     print("\"Write a query to find all cars (no matter the dealership) "
           "with mileage below an integer limit (eg 20,000 miles)\"")
-    five_digit_mileage_cars = Car.objects.filter(mileage__lt=100000)
+    mileage_limit = 100000
+    print(f"Mileage limit: {mileage_limit}")
+    five_digit_mileage_cars = Car.objects.filter(mileage__lt=mileage_limit)
     print(five_digit_mileage_cars)
 
+    print("\n")
     time.sleep(1)
 
     print("\"Write a query to find all dealerships that have more than 3 "
@@ -270,6 +311,7 @@ def do_all_the_things():
     ).filter(year_established__gt=1980, num_cars__gte=3)
     print(old_dealerships)
 
+    print("\n")
     time.sleep(1)
 
     print("\"Write a method for the dealership model that returns only red "
@@ -278,20 +320,26 @@ def do_all_the_things():
     red_fords_low_mileage = dealership.find_red_fords_under_30000()
     print(red_fords_low_mileage)
 
+    print("\n")
     time.sleep(1)
 
     print("\"Open an actual car dealership with your newfound expertise :)\"")
-    print("Okay, done. Enter your name:")
+    print("Okay, done. Please enter your name:")
     name = input()
 
+    for i in range(0, 15):
+        print("\n")
+
     print(f'Welcome {name} to {dealership.name} where we are...')
-    time.sleep(1)
+    time.sleep(3)
+
+    for i in range(0, 15):
+        print("\n")
+
     print("Never gonna give you up")
-    time.sleep(1)
+    time.sleep(2)
     print("Never gonna let you down")
-    time.sleep(1)
+    time.sleep(2)
     print("Never gonna run around ")
-    time.sleep(1)
+    time.sleep(2)
     print("and hurt you")
-    time.sleep(1)
-    print("More info: https://www.youtube.com/watch?v=dQw4w9WgXcQ")
